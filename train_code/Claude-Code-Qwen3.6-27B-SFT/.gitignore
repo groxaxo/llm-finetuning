@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+vendor/
+data/raw/
+data/processed/
+data/processed-distilled/
+data/distilled-*/
+data/axolotl-prepared-*/
+outputs/
+wandb/
