@@ -7,14 +7,16 @@ This catalog lists the training notebooks and Python tutorials that are currentl
 | Goal | Start here |
 |---|---|
 | Run a browser-based SFT tutorial | Open a Colab or Kaggle notebook from the SFT table below |
+| Train Qwen3.6 27B on Claude Code traces | Open [`Claude-Code-Qwen3.6-27B-SFT/README.md`](Claude-Code-Qwen3.6-27B-SFT/README.md) |
 | Run reinforcement learning | Start with the GRPO or GSPO entries below |
-| Inspect the new Qwopus3.6 27B GSPO workflow | Open [`Qwopus3.6-27B-GSPO/README.md`](Qwopus3.6-27B-GSPO/README.md) |
+| Inspect the Qwopus3.6 27B GSPO workflow | Open [`Qwopus3.6-27B-GSPO/README.md`](Qwopus3.6-27B-GSPO/README.md) |
 | Prepare distilled training data first | See [`../data_processing_code/README.md`](../data_processing_code/README.md) |
 
 ## 📘 Supervised Fine-Tuning (SFT)
 
 | Model | Size | Method | Environment | File | Status | Notes |
 |---|---:|---|---|---|---|---|
+| Qwen3.6 / ThinkingCap | 27B | QLoRA SFT | Axolotl FSDP2 | [`Claude-Code-Qwen3.6-27B-SFT/`](Claude-Code-Qwen3.6-27B-SFT/) | ✅ Released | Claude Code tool-trace pipeline, validated on 3x RTX 3090 24 GB with FSDP2 CPU offload. |
 | Qwopus3.5 | 27B | SFT | Google Colab | [`Qwopus3-5-27b-Colab.ipynb`](Qwopus3-5-27b-Colab.ipynb) | ✅ Released | End-to-end beginner Colab workflow with LoRA, export, and deployment notes. |
 | Qwen3.5 Neo | 9B | SFT | Kaggle | [`Qwen3.5-9B-Neo-Kaggle.ipynb`](Qwen3.5-9B-Neo-Kaggle.ipynb) | ✅ Released | Kaggle training workflow for a compact Qwen-family fine-tune. |
 | Qwopus3.5 | 35B-A3B | SFT | Kaggle | [`Qwopus-3.5-35B-A3B-Kaggle.ipynb`](Qwopus-3.5-35B-A3B-Kaggle.ipynb) | ✅ Released | Kaggle workflow for the larger Qwopus3.5 release. |
@@ -30,7 +32,7 @@ This catalog lists the training notebooks and Python tutorials that are currentl
 
 | Topic | Where to look |
 |---|---|
-| LoRA adapter save | Individual training notebooks or the Qwopus3.6 GSPO script |
+| LoRA adapter save | Individual training notebooks or the Claude Code / Qwopus3.6 recipes |
 | Merged 16-bit export | [`Qwopus3.6-27B-GSPO/README.md`](Qwopus3.6-27B-GSPO/README.md) and notebook export cells |
 | GGUF export | [`Qwopus3.6-27B-GSPO/README.md`](Qwopus3.6-27B-GSPO/README.md) and the [Qwen MTP GGUF Skill](../qwen-mtp-gguf/) |
 | Multimodal projector handling | [`Qwopus3.6-27B-GSPO/README.md#multimodal-projector-mmproj`](Qwopus3.6-27B-GSPO/README.md#multimodal-projector-mmproj) |
