@@ -1,0 +1,22 @@
+[
+  {
+    "id": "inspect_before_edit",
+    "prompt": "A parser test is failing. Inspect the implementation and the focused test before changing code.",
+    "expected_first_tools": ["Read", "Bash"]
+  },
+  {
+    "id": "run_tests_after_change",
+    "prompt": "The bug is in src/config.py. Make the smallest correct change and verify it with the focused test suite.",
+    "expected_first_tools": ["Read", "Bash"]
+  },
+  {
+    "id": "search_unknown_symbol",
+    "prompt": "Find where build_prompt is defined and identify all callers before proposing a refactor.",
+    "expected_first_tools": ["Bash", "Read"]
+  },
+  {
+    "id": "avoid_blind_edit",
+    "prompt": "Update the retry logic in the API client. Do not guess the file contents.",
+    "expected_first_tools": ["Read", "Bash"]
+  }
+]
