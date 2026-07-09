@@ -1,0 +1,29 @@
+name: Claude Code Qwen pipeline
+
+on:
+  pull_request:
+    paths:
+      - "train_code/Claude-Code-Qwen3.6-27B-SFT/**"
+      - ".github/workflows/claude-code-qwen-pipeline.yml"
+  push:
+    branches: [main]
+    paths:
+      - "train_code/Claude-Code-Qwen3.6-27B-SFT/**"
+      - ".github/workflows/claude-code-qwen-pipeline.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run converter tests
+        run: >-
+          python -m unittest discover
+          -s train_code/Claude-Code-Qwen3.6-27B-SFT/tests
+          -v
