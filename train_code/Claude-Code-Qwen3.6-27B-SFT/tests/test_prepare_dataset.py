@@ -1,7 +1,11 @@
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+
+RECIPE_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(RECIPE_DIR))
 
 from claude_code_pipeline.converter import (
     ApproxTokenCounter,
