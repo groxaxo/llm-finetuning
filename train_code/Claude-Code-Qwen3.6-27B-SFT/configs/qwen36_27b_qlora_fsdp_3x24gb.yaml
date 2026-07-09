@@ -1,0 +1,98 @@
+# Multi-GPU FSDP2 QLoRA profile validated on 3x RTX 3090 24 GB GPUs with CPU parameter offload.
+base_model: bottlecapai/ThinkingCap-Qwen3.6-27B
+strict: false
+trust_remote_code: false
+
+plugins:
+  - axolotl.integrations.cut_cross_entropy.CutCrossEntropyPlugin
+
+chat_template: tokenizer_default
+chat_template_kwargs:
+  preserve_thinking: true
+
+datasets:
+  - path: ./data/processed/train.jsonl
+    type: chat_template
+    field_messages: messages
+    field_tools: tools
+    field_thinking: reasoning_content
+    template_thinking_key: reasoning_content
+    message_field_training: train
+    roles_to_train: [assistant]
+    train_on_eos: turn
+    train_on_eot: turn
+
+test_datasets:
+  - path: ./data/processed/validation.jsonl
+    type: chat_template
+    field_messages: messages
+    field_tools: tools
+    field_thinking: reasoning_content
+    template_thinking_key: reasoning_content
+    message_field_training: train
+    roles_to_train: [assistant]
+    train_on_eos: turn
+    train_on_eot: turn
+
+val_set_size: 0.0
+output_dir: ./outputs/qwen36-27b-claude-code-qlora-fsdp
+# Never share this prepared-cache path with a different config or sequence length.
+dataset_prepared_path: ./data/axolotl-prepared-fsdp-8k
+seed: 3407
+
+sequence_len: 8192
+sample_packing: false
+eval_sample_packing: false
+pad_to_sequence_len: false
+group_by_length: true
+train_on_inputs: false
+
+load_in_4bit: true
+adapter: qlora
+lora_r: 64
+lora_alpha: 128
+lora_dropout: 0.05
+lora_target_modules: ".*\\.language_model\\.layers\\.[0-9]+\\.(?:self_attn\\.(?:q_proj|k_proj|v_proj|o_proj)|linear_attn\\.(?:in_proj_qkv|in_proj_z|in_proj_b|in_proj_a|out_proj)|mlp\\.(?:gate_proj|up_proj|down_proj))"
+
+micro_batch_size: 1
+gradient_accumulation_steps: 4
+num_epochs: 2
+optimizer: adamw_torch_4bit
+learning_rate: 1.0e-4
+lr_scheduler: cosine
+warmup_ratio: 0.03
+weight_decay: 0.01
+max_grad_norm: 1.0
+
+bf16: true
+tf32: true
+attn_implementation: flash_attention_2
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+
+logging_steps: 1
+evals_per_epoch: 4
+saves_per_epoch: 4
+save_total_limit: 3
+load_best_model_at_end: true
+metric_for_best_model: eval_loss
+greater_is_better: false
+auto_resume_from_checkpoints: true
+
+fsdp_config:
+  fsdp_version: 2
+  # CPU parameter offload is intentional for 3x RTX 3090 / 24 GB cards.
+  # It is slower than pure GPU FSDP, but makes the 27B QLoRA run practical.
+  offload_params: true
+  cpu_ram_efficient_loading: true
+  auto_wrap_policy: TRANSFORMER_BASED_WRAP
+  transformer_layer_cls_to_wrap: Qwen3_5DecoderLayer
+  state_dict_type: FULL_STATE_DICT
+  sharding_strategy: FULL_SHARD
+  reshard_after_forward: true
+  activation_checkpointing: true
+
+wandb_project: qwen36-claude-code
+wandb_name: qwen36-27b-claude-code-qlora-r64-8k-fsdp2-offload
+wandb_log_model: false
