@@ -1,0 +1,92 @@
+# Text-only QLoRA for Qwen3.6-27B Claude Code tool traces.
+# Run from this recipe directory after prepare_dataset.py and validate_dataset.py.
+base_model: bottlecapai/ThinkingCap-Qwen3.6-27B
+strict: false
+trust_remote_code: false
+
+plugins:
+  - axolotl.integrations.cut_cross_entropy.CutCrossEntropyPlugin
+
+# Use the model's own tokenizer template. Qwen3.6's template owns all
+# <think>, <tool_call>, and <tool_response> markup.
+chat_template: tokenizer_default
+chat_template_kwargs:
+  preserve_thinking: true
+
+datasets:
+  - path: ./data/processed/train.jsonl
+    type: chat_template
+    field_messages: messages
+    field_tools: tools
+    field_thinking: reasoning_content
+    template_thinking_key: reasoning_content
+    message_field_training: train
+    roles_to_train: [assistant]
+    train_on_eos: turn
+    train_on_eot: turn
+
+test_datasets:
+  - path: ./data/processed/validation.jsonl
+    type: chat_template
+    field_messages: messages
+    field_tools: tools
+    field_thinking: reasoning_content
+    template_thinking_key: reasoning_content
+    message_field_training: train
+    roles_to_train: [assistant]
+    train_on_eos: turn
+    train_on_eot: turn
+
+val_set_size: 0.0
+output_dir: ./outputs/qwen36-27b-claude-code-qlora
+dataset_prepared_path: ./data/axolotl-prepared-single
+seed: 3407
+
+# Cross-example sample packing is deliberately disabled. Tool traces are already
+# split on causal transaction boundaries, and Qwen's Gated DeltaNet requires
+# additional packing support. Correct boundaries are worth more than throughput.
+sequence_len: 8192
+sample_packing: false
+eval_sample_packing: false
+pad_to_sequence_len: false
+group_by_length: true
+train_on_inputs: false
+
+load_in_4bit: true
+adapter: qlora
+lora_r: 64
+lora_alpha: 128
+lora_dropout: 0.05
+# Full-name regex limits adapters to the text backbone. Vision and MTP modules
+# stay frozen and therefore remain byte-for-byte base weights in adapter mode.
+lora_target_modules: ".*\\.language_model\\.layers\\.[0-9]+\\.(?:self_attn\\.(?:q_proj|k_proj|v_proj|o_proj)|linear_attn\\.(?:in_proj_qkv|in_proj_z|in_proj_b|in_proj_a|out_proj)|mlp\\.(?:gate_proj|up_proj|down_proj))"
+
+micro_batch_size: 1
+gradient_accumulation_steps: 8
+num_epochs: 2
+optimizer: adamw_torch_4bit
+learning_rate: 1.0e-4
+lr_scheduler: cosine
+warmup_ratio: 0.03
+weight_decay: 0.01
+max_grad_norm: 1.0
+
+bf16: true
+tf32: true
+attn_implementation: flash_attention_2
+gradient_checkpointing: true
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+
+logging_steps: 1
+evals_per_epoch: 4
+saves_per_epoch: 4
+save_total_limit: 3
+load_best_model_at_end: true
+metric_for_best_model: eval_loss
+greater_is_better: false
+auto_resume_from_checkpoints: true
+
+wandb_project: qwen36-claude-code
+wandb_name: qwen36-27b-claude-code-qlora-r64-8k
+wandb_log_model: false
