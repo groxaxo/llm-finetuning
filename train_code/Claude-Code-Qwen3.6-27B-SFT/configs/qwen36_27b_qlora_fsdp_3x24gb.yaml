@@ -1,4 +1,4 @@
-# Multi-GPU FSDP2 QLoRA profile validated on 3x RTX 3090 24 GB GPUs with CPU parameter offload.
+# Validated hardware profile: 3x RTX 3090 24 GB, FSDP2 QLoRA, CPU parameter offload.
 base_model: bottlecapai/ThinkingCap-Qwen3.6-27B
 strict: false
 trust_remote_code: false
@@ -36,8 +36,8 @@ test_datasets:
 
 val_set_size: 0.0
 output_dir: ./outputs/qwen36-27b-claude-code-qlora-fsdp
-# Never share this prepared-cache path with a different config or sequence length.
-dataset_prepared_path: ./data/axolotl-prepared-fsdp-8k
+# Never reuse a prepared cache after changing data, tokenizer, or sequence_len.
+dataset_prepared_path: ./data/axolotl-prepared-fsdp-8k-v2
 seed: 3407
 
 sequence_len: 8192
@@ -52,7 +52,9 @@ adapter: qlora
 lora_r: 64
 lora_alpha: 128
 lora_dropout: 0.05
-lora_target_modules: ".*\\.language_model\\.layers\\.[0-9]+\\.(?:self_attn\\.(?:q_proj|k_proj|v_proj|o_proj)|linear_attn\\.(?:in_proj_qkv|in_proj_z|in_proj_b|in_proj_a|out_proj)|mlp\\.(?:gate_proj|up_proj|down_proj))"
+# Qwen3.6 has 64 primary text layers (0-63) plus an MTP layer. The explicit
+# index range prevents adapters from being attached to the MTP layer or vision tower.
+lora_target_modules: ".*\\.language_model\\.layers\\.(?:[0-9]|[1-5][0-9]|6[0-3])\\.(?:self_attn\\.(?:q_proj|k_proj|v_proj|o_proj)|linear_attn\\.(?:in_proj_qkv|in_proj_z|in_proj_b|in_proj_a|out_proj)|mlp\\.(?:gate_proj|up_proj|down_proj))"
 
 micro_batch_size: 1
 gradient_accumulation_steps: 4
@@ -82,8 +84,6 @@ auto_resume_from_checkpoints: true
 
 fsdp_config:
   fsdp_version: 2
-  # CPU parameter offload is intentional for 3x RTX 3090 / 24 GB cards.
-  # It is slower than pure GPU FSDP, but makes the 27B QLoRA run practical.
   offload_params: true
   cpu_ram_efficient_loading: true
   auto_wrap_policy: TRANSFORMER_BASED_WRAP
@@ -94,5 +94,5 @@ fsdp_config:
   activation_checkpointing: true
 
 wandb_project: qwen36-claude-code
-wandb_name: qwen36-27b-claude-code-qlora-r64-8k-fsdp2-offload
+wandb_name: qwen36-27b-claude-code-qlora-r64-8k-fsdp2-offload-v2
 wandb_log_model: false
