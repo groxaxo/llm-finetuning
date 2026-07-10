@@ -1,5 +1,4 @@
-# Text-only QLoRA for Qwen3.6-27B Claude Code tool traces.
-# Run from this recipe directory after prepare_dataset.py and validate_dataset.py.
+# Single 80 GB-class GPU QLoRA profile for the same prepared tool-trace data.
 base_model: bottlecapai/ThinkingCap-Qwen3.6-27B
 strict: false
 trust_remote_code: false
@@ -7,8 +6,6 @@ trust_remote_code: false
 plugins:
   - axolotl.integrations.cut_cross_entropy.CutCrossEntropyPlugin
 
-# Use the model's own tokenizer template. Qwen3.6's template owns all
-# <think>, <tool_call>, and <tool_response> markup.
 chat_template: tokenizer_default
 chat_template_kwargs:
   preserve_thinking: true
@@ -39,12 +36,9 @@ test_datasets:
 
 val_set_size: 0.0
 output_dir: ./outputs/qwen36-27b-claude-code-qlora
-dataset_prepared_path: ./data/axolotl-prepared-single
+dataset_prepared_path: ./data/axolotl-prepared-single-8k-v2
 seed: 3407
 
-# Cross-example sample packing is deliberately disabled. Tool traces are already
-# split on causal transaction boundaries, and Qwen's Gated DeltaNet requires
-# additional packing support. Correct boundaries are worth more than throughput.
 sequence_len: 8192
 sample_packing: false
 eval_sample_packing: false
@@ -57,9 +51,8 @@ adapter: qlora
 lora_r: 64
 lora_alpha: 128
 lora_dropout: 0.05
-# Full-name regex limits adapters to the text backbone. Vision and MTP modules
-# stay frozen and therefore remain byte-for-byte base weights in adapter mode.
-lora_target_modules: ".*\\.language_model\\.layers\\.[0-9]+\\.(?:self_attn\\.(?:q_proj|k_proj|v_proj|o_proj)|linear_attn\\.(?:in_proj_qkv|in_proj_z|in_proj_b|in_proj_a|out_proj)|mlp\\.(?:gate_proj|up_proj|down_proj))"
+# Excludes the vision tower and the extra MTP layer (primary text layers are 0-63).
+lora_target_modules: ".*\\.language_model\\.layers\\.(?:[0-9]|[1-5][0-9]|6[0-3])\\.(?:self_attn\\.(?:q_proj|k_proj|v_proj|o_proj)|linear_attn\\.(?:in_proj_qkv|in_proj_z|in_proj_b|in_proj_a|out_proj)|mlp\\.(?:gate_proj|up_proj|down_proj))"
 
 micro_batch_size: 1
 gradient_accumulation_steps: 8
@@ -88,5 +81,5 @@ greater_is_better: false
 auto_resume_from_checkpoints: true
 
 wandb_project: qwen36-claude-code
-wandb_name: qwen36-27b-claude-code-qlora-r64-8k
+wandb_name: qwen36-27b-claude-code-qlora-r64-8k-v2
 wandb_log_model: false
