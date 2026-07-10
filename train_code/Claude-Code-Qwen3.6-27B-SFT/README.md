@@ -1,68 +1,76 @@
 # Claude Code -> Qwen3.6 27B Tool-Trace SFT
 
-This recipe prepares exported Claude Code sessions for Qwen3.6/ThinkingCap 27B supervised fine-tuning with Axolotl. It preserves user, assistant, reasoning, tool-call, and tool-result structure so the tokenizer's Qwen chat template can render native `<think>`, `<tool_call>`, and `<tool_response>` blocks.
+A conservative, auditable pipeline for converting exported Claude Code sessions into Qwen-native structured tool-use training rows and fine-tuning `bottlecapai/ThinkingCap-Qwen3.6-27B` with Axolotl.
 
-## Validated hardware path
+The practical local training path has been validated on **3x RTX 3090 24 GB GPUs** using **FSDP2 QLoRA with CPU parameter offload**.
 
-The practical local path is now validated on **3x RTX 3090 24 GB GPUs** using **Axolotl FSDP2 QLoRA with CPU parameter offload**.
+## What this recipe guarantees
 
-Use:
+- Native `user`, `assistant`, and `tool` message roles.
+- Assistant reasoning preserved in `reasoning_content`.
+- Native structured `tool_calls`, never hand-written Qwen control tokens.
+- Tool-call/result ID and name validation.
+- Lossless repair of adjacent streaming fragments.
+- Deterministic conversion of `[TOOL_CALL: Name] {json}` text markers.
+- ANSI/local-client artifact removal and secret redaction by default.
+- Atomic tool transactions during context chunking.
+- Overlap context masked from loss so repeated context is not learned twice.
+- Deterministic **session-level** train/validation splitting with leakage checks.
+- Exact target-tokenizer rendering and token-count validation before training.
+- LoRA restricted to primary text layers **0-63**. Vision and the extra MTP layer remain frozen.
+- Arrow-safe storage: heterogeneous `tools` and tool arguments are stored as JSON strings and decoded by Axolotl before applying the chat template.
+
+## Repository layout
+
+```text
+Claude-Code-Qwen3.6-27B-SFT/
+├── claude_code_pipeline/       # parser, sanitizer, validator, schema inference, chunker
+├── configs/                    # Axolotl single-GPU and 3x3090/FSDP2 profiles
+├── examples/                   # deterministic first-tool evaluation cases
+├── scripts/                    # export, prepare, validate, infer, evaluate, MTP verification
+└── tests/                      # protocol and end-to-end regression tests
+```
+
+## 1. Preserve the known-working environment
+
+Because the 3x3090 run is already proven on your machine, record that environment before changing packages:
 
 ```bash
-axolotl preprocess configs/qwen36_27b_qlora_fsdp_3x24gb.yaml
-
-CUDA_VISIBLE_DEVICES=0,1,2 \
-PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-NCCL_P2P_DISABLE=0 \
-axolotl train configs/qwen36_27b_qlora_fsdp_3x24gb.yaml \
-  --launcher torchrun -- --nproc_per_node 3
+python --version
+python -m pip freeze > axolotl-working-environment.txt
+axolotl --version || true
+nvidia-smi
 ```
 
-The FSDP2 config intentionally sets:
+Reusing the known-working Axolotl environment is safer than upgrading it during a training campaign.
 
-```yaml
-fsdp_config:
-  fsdp_version: 2
-  offload_params: true
-  cpu_ram_efficient_loading: true
-  sharding_strategy: FULL_SHARD
-  transformer_layer_cls_to_wrap: Qwen3_5DecoderLayer
-```
-
-This is slower than pure-GPU FSDP, but it makes 27B QLoRA feasible on 24 GB cards. Keep host RAM clear; 125 GB-class RAM is a sensible target.
-
-## Why the format matters
-
-Do **not** pre-render Qwen control tokens into the dataset. The dataset keeps structured messages:
-
-- assistant reasoning in `reasoning_content`
-- assistant tool calls in `tool_calls[].function.arguments` as JSON mappings
-- tool outputs as `role: tool`
-- tool schemas in the row-level `tools` field
-- loss masking through per-message `train`
-
-The Axolotl configs use:
-
-```yaml
-chat_template: tokenizer_default
-chat_template_kwargs:
-  preserve_thinking: true
-```
-
-`preserve_thinking: true` is required so historical reasoning traces are not silently dropped by the Qwen chat template.
-
-## Pipeline
-
-Run from this folder:
+For a clean reference installation, use a dedicated virtual environment and pin the Axolotl checkout:
 
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+python -m pip install --upgrade pip uv
+
+mkdir -p vendor
+git clone https://github.com/axolotl-ai-cloud/axolotl.git vendor/axolotl
+git -C vendor/axolotl checkout 6401a353c68c22e00e0a4e257b8e8594db69d17a
+
+uv pip install -e './vendor/axolotl[flash-attn,deepspeed]'
+uv pip install -r requirements.txt
 ```
 
-Export Claude Code sessions:
+`requirements.txt` contains only helper-script dependencies. Axolotl owns the compatible PyTorch, CUDA, Transformers, PEFT, and bitsandbytes versions.
+
+Run the repository checks:
+
+```bash
+python -m unittest discover -s tests -v
+python scripts/validate_recipe.py
+```
+
+## 2. Export Claude Code session transcripts
+
+By default the exporter searches known transcript roots such as `~/.claude/projects`, not every JSON file under `~/.claude`.
 
 ```bash
 python scripts/export_claude_sessions.py \
@@ -70,7 +78,11 @@ python scripts/export_claude_sessions.py \
   --output-dir data/raw/claude-code
 ```
 
-Prepare and split the dataset:
+Use `--dry-run` to inspect the file set. Use `--source PATH` repeatedly to select explicit roots. Plain `.json` files are excluded unless `--include-json` is specified. A SHA-256 manifest is written with the snapshot.
+
+## 3. Prepare the dataset
+
+Use the target tokenizer so every chunk is measured after the real Qwen chat template is applied:
 
 ```bash
 python scripts/prepare_dataset.py \
@@ -78,12 +90,33 @@ python scripts/prepare_dataset.py \
   --output-dir data/processed \
   --model bottlecapai/ThinkingCap-Qwen3.6-27B \
   --max-seq-length 8192 \
+  --overlap-messages 6 \
   --validation-ratio 0.02 \
   --seed 3407 \
-  --secret-policy quarantine
+  --secret-policy redact
 ```
 
-Validate before training:
+Outputs:
+
+```text
+data/processed/
+├── train.jsonl
+├── validation.jsonl
+├── rejected.jsonl
+└── REPORT.json
+```
+
+Important behavior:
+
+- The source is never modified.
+- Exact duplicate sessions are rejected with provenance.
+- All chunks from one source session remain in the same split.
+- `redact` is the recommended default. `quarantine` rejects the entire session when a credential-like value is detected; `allow` should be used only on data already proven safe.
+- Each row carries `schema_version`, `session_id`, `content_hash`, `chunk_index`, and `chunk_count` metadata.
+
+## 4. Validate before training
+
+This gate validates protocol ordering, loss masks, declared tool schemas, session isolation, exact row isolation, maximum rendered length, and the exact text generated by the target chat template:
 
 ```bash
 python scripts/validate_dataset.py \
@@ -94,14 +127,160 @@ python scripts/validate_dataset.py \
   --render-count 5
 ```
 
-## Important choices
+Manually inspect the rendered examples. A correct example should show this causal pattern:
 
-- `sample_packing: false`: avoids cross-session leakage and keeps tool transactions causal.
-- LoRA targets include Qwen3.6 text-backbone attention, linear-attention, and MLP projections.
-- Vision and MTP modules are not targeted by LoRA.
-- Tool call/result pairs are validated before training.
-- Secret-like content is quarantined by default.
+```text
+user request
+assistant reasoning + structured tool call
+tool result
+assistant reasoning / next tool call / final response
+```
 
-## Fallbacks
+Do not start training when validation fails or when the rendered examples do not match inference-time formatting.
 
-If your local CUDA/PyTorch/kernel stack still OOMs at 8192, regenerate the processed dataset with `--max-seq-length 4096` and change `sequence_len` plus `dataset_prepared_path` in the Axolotl YAML. Do not let Axolotl silently truncate 8192-token rows.
+## 5. Why `preserve_thinking` is required
+
+The dataset remains structured and lets the tokenizer own all control markup:
+
+```yaml
+chat_template: tokenizer_default
+chat_template_kwargs:
+  preserve_thinking: true
+```
+
+Without `preserve_thinking: true`, historical reasoning can be omitted by the Qwen template. The pipeline never writes `<think>`, `<tool_call>`, `<tool_response>`, or ChatML control tokens into message content.
+
+## 6. Validated 3x RTX 3090 FSDP2 QLoRA training
+
+The validated configuration is:
+
+```text
+configs/qwen36_27b_qlora_fsdp_3x24gb.yaml
+```
+
+It intentionally uses:
+
+```yaml
+fsdp_config:
+  fsdp_version: 2
+  offload_params: true
+  cpu_ram_efficient_loading: true
+  sharding_strategy: FULL_SHARD
+  transformer_layer_cls_to_wrap: Qwen3_5DecoderLayer
+  reshard_after_forward: true
+  activation_checkpointing: true
+```
+
+Preprocess only after the final dataset and config are fixed:
+
+```bash
+rm -rf data/axolotl-prepared-fsdp-8k-v2
+axolotl preprocess configs/qwen36_27b_qlora_fsdp_3x24gb.yaml
+```
+
+Launch training:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2 \
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
+NCCL_P2P_DISABLE=0 \
+axolotl train configs/qwen36_27b_qlora_fsdp_3x24gb.yaml \
+  --launcher torchrun -- --nproc_per_node 3
+```
+
+The effective batch size is:
+
+```text
+3 processes x micro_batch_size 1 x gradient_accumulation_steps 4 = 12 sequences/update
+```
+
+CPU offload is slower than pure-GPU FSDP, but it is the validated path for three 24 GB cards. Keep host RAM and swap pressure under observation during loading, evaluation, and checkpoint consolidation.
+
+### Resume
+
+`auto_resume_from_checkpoints: true` is enabled. Relaunch the same command with the unchanged data, tokenizer, adapter shape, and configuration. Never resume after changing LoRA rank, target modules, sequence length, or prepared data.
+
+## 7. MTP preservation
+
+Qwen3.6 has 64 primary text layers and an additional MTP/next-token layer. The LoRA regex explicitly targets only layers `0-63`; it does not target the vision tower or the extra MTP layer.
+
+Validate the checked-in regex before every run:
+
+```bash
+python scripts/validate_recipe.py
+```
+
+After merging the adapter, compare the merged model with a local copy of the base checkpoint:
+
+```bash
+axolotl merge-lora configs/qwen36_27b_qlora_fsdp_3x24gb.yaml
+
+python scripts/verify_mtp.py \
+  /absolute/path/to/merged-checkpoint \
+  --base /absolute/path/to/base-checkpoint
+```
+
+The verifier inspects the safetensors index or actual safetensor keys. It does not rely on filenames.
+
+## 8. Serve and smoke-test tool use
+
+Example vLLM launch:
+
+```bash
+vllm serve /absolute/path/to/merged-checkpoint \
+  --served-model-name qwen36-claude-code \
+  --tensor-parallel-size 3 \
+  --max-model-len 8192 \
+  --reasoning-parser qwen3 \
+  --enable-auto-tool-choice \
+  --tool-call-parser qwen3_coder \
+  --language-model-only \
+  --port 8000
+```
+
+Check that a structured call is returned:
+
+```bash
+python scripts/infer_tool_trace.py \
+  --base-url http://127.0.0.1:8000/v1 \
+  --model qwen36-claude-code
+```
+
+Run deterministic first-tool cases:
+
+```bash
+python scripts/evaluate_tool_calls.py \
+  --base-url http://127.0.0.1:8000/v1 \
+  --model qwen36-claude-code \
+  --cases examples/tool_eval_cases.json \
+  --output outputs/tool_eval_results.json
+```
+
+This evaluator is a protocol smoke test, not a complete coding-agent benchmark. The next evaluation tier should run the model in disposable repositories and score file inspection, patch correctness, focused tests, recovery after failures, and task completion.
+
+## 9. 4K fallback
+
+When the exact 8K run does not fit your local software stack:
+
+1. Regenerate the dataset with `--max-seq-length 4096`.
+2. Set `sequence_len: 4096` in the selected YAML.
+3. Change `dataset_prepared_path` to a new 4K-specific directory.
+4. Re-run `validate_dataset.py` with `--max-seq-length 4096`.
+5. Re-run Axolotl preprocessing from scratch.
+
+Never let Axolotl silently truncate rows prepared for a longer context.
+
+## Non-negotiable checks before a full run
+
+```bash
+python -m unittest discover -s tests -v
+python scripts/validate_recipe.py
+python scripts/validate_dataset.py \
+  --train data/processed/train.jsonl \
+  --validation data/processed/validation.jsonl \
+  --model bottlecapai/ThinkingCap-Qwen3.6-27B \
+  --max-seq-length 8192 \
+  --render-count 5
+```
+
+Proceed only when all three pass and the rendered samples have been manually inspected.
