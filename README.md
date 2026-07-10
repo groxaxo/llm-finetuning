@@ -13,7 +13,7 @@ dataset distillation, reinforcement learning, and local deployment.
 
 [![Unsloth](https://img.shields.io/badge/Powered%20by-Unsloth-8A2BE2?style=flat-square)](https://github.com/unslothai/unsloth)
 [![Google Colab](https://img.shields.io/badge/Environment-Google%20Colab-F9AB00?style=flat-square&logo=googlecolab&logoColor=white)](https://colab.research.google.com/)
-[![PyTorch](https://img.shields.io/badge/Framework-PyTorch-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![PyTorch](https://img.shields.io/badge/Framework-PyTorch-EE4C2C?style=flat-square&logo=pytorch)](https://pytorch.org/)
 [![Hugging Face](https://img.shields.io/badge/Model%20Hub-Hugging%20Face-FFD21E?style=flat-square&logo=huggingface&logoColor=black)](https://huggingface.co/)
 [![LoRA PEFT](https://img.shields.io/badge/Technique-LoRA%20%2F%20PEFT-007EC6?style=flat-square)](#)
 [![Beginner Friendly](https://img.shields.io/badge/Level-Beginner%20Friendly-brightgreen?style=flat-square)](#)
@@ -22,7 +22,7 @@ dataset distillation, reinforcement learning, and local deployment.
 
 ---
 
-This repository is a growing educational resource portal for beginners and developers who want reproducible training pipelines, SFT and RL workflows including GRPO and GSPO, data preparation and distillation recipes, 16-bit export and GGUF deployment workflows, and agent-ready Qwen MTP GGUF conversion tools.
+This repository is a growing educational resource portal for beginners and developers who want reproducible training pipelines, SFT and RL workflows including GRPO and GSPO, data preparation and distillation recipes, 16-bit export and GGUF deployment workflows, agent-ready Qwen MTP GGUF conversion tools, and Claude Code-style tool-trace fine-tuning recipes.
 
 ## 📚 Table of Contents
 
@@ -41,6 +41,7 @@ This repository is a growing educational resource portal for beginners and devel
 
 | I want to... | Recommended entry |
 |---|---|
+| Fine-tune Qwen3.6 27B on Claude Code tool sessions | [Open the Claude Code Qwen3.6 SFT pipeline](train_code/Claude-Code-Qwen3.6-27B-SFT/) |
 | Fine-tune my first model in a browser | [Open the training recipe catalog](train_code/) |
 | Run the Qwopus3.6 27B GSPO tutorial | [Open the GSPO Python tutorial](train_code/Qwopus3.6-27B-GSPO/qwopus3_6_27b_gspo_training.py) |
 | Prepare or distill training data | [Browse data-processing recipes](data_processing_code/) |
@@ -54,6 +55,7 @@ This repository is a growing educational resource portal for beginners and devel
 | Resource | What you will find | Entry |
 |---|---|---|
 | 🏋️ Training Recipes | SFT, GRPO, and GSPO notebooks and Python tutorials | [Open](train_code/) |
+| 🤖 Claude Code Qwen SFT | Claude Code export parsing, Qwen-native tool formatting, Axolotl FSDP2 QLoRA configs | [Open](train_code/Claude-Code-Qwen3.6-27B-SFT/) |
 | 🧪 Data Processing | Distillation, preprocessing, filtering, and sampling workflows | [Open](data_processing_code/) |
 | 🧠 Dataset Catalog | Curated high-fidelity datasets and download helpers | [Open](High-fidelity%20Dataset/) |
 | ⚙️ Qwen MTP GGUF Skill | Agent-ready MTP extraction, injection, conversion, validation, quantization, and upload pipeline | [Open](qwen-mtp-gguf/) |
@@ -65,6 +67,7 @@ This repository is a growing educational resource portal for beginners and devel
 
 | Model | Method | Environment | Quick setup |
 |---|---|---|---|
+| Qwen3.6 / ThinkingCap 27B | Claude Code SFT / QLoRA | Axolotl FSDP2 | [Open recipe](train_code/Claude-Code-Qwen3.6-27B-SFT/) — validated on 3x RTX 3090 24 GB with CPU offload |
 | Qwopus3.5 27B | SFT | Google Colab | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/R6410418/Jackrong-llm-finetuning-guide/blob/main/train_code/Qwopus3-5-27b-Colab.ipynb) |
 | Qwopus3.6 27B | GSPO | Python script | [![Python Code](https://img.shields.io/badge/Code-Python-3776AB?style=flat-square&logo=python&logoColor=white)](train_code/Qwopus3.6-27B-GSPO/qwopus3_6_27b_gspo_training.py) |
 | Qwen3.5 9B | SFT | Kaggle | [![Open In Kaggle](https://img.shields.io/badge/Open%20in-Kaggle-20BEFF?style=flat-square&logo=kaggle&logoColor=white)](https://kaggle.com/kernels/welcome?src=https://github.com/R6410418/Jackrong-llm-finetuning-guide/blob/main/train_code/Qwen3.5-9B-Neo-Kaggle.ipynb) |
@@ -78,6 +81,7 @@ Browse the full catalog in [train_code/README.md](train_code/README.md).
 | Workflow | Status | Documentation |
 |---|---|---|
 | SFT with LoRA / QLoRA | ✅ Released | [Training recipes](train_code/) |
+| Claude Code tool-trace SFT | ✅ Released | [Claude Code Qwen3.6 pipeline](train_code/Claude-Code-Qwen3.6-27B-SFT/) |
 | GRPO reinforcement learning | ✅ Released | [Training recipes](train_code/) |
 | GSPO reinforcement learning | ✅ Released | [Qwopus3.6 27B GSPO tutorial](train_code/Qwopus3.6-27B-GSPO/qwopus3_6_27b_gspo_training.py) |
 | Dataset distillation and preprocessing | ✅ Released | [Data-processing recipes](data_processing_code/) |
