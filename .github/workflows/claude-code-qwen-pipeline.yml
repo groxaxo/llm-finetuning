@@ -11,19 +11,41 @@ on:
       - "train_code/Claude-Code-Qwen3.6-27B-SFT/**"
       - ".github/workflows/claude-code-qwen-pipeline.yml"
 
+concurrency:
+  group: claude-code-qwen-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  unit-tests:
+  checks:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-      - name: Run converter tests
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip pyyaml
+      - name: Compile Python sources
+        run: python -m compileall -q train_code/Claude-Code-Qwen3.6-27B-SFT
+      - name: Run converter and pipeline tests
         run: >-
           python -m unittest discover
           -s train_code/Claude-Code-Qwen3.6-27B-SFT/tests
           -v
+      - name: Validate Axolotl recipe configs
+        run: python train_code/Claude-Code-Qwen3.6-27B-SFT/scripts/validate_recipe.py
+      - name: Check CLI entry points
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in train_code/Claude-Code-Qwen3.6-27B-SFT/scripts/*.py; do
+            python "$script" --help >/dev/null
+          done
